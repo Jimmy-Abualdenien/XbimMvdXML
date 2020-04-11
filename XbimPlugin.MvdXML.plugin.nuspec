@@ -2,27 +2,29 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2011/10/nuspec.xsd">
   <metadata>
     <id>XbimPlugin.MvdXML</id>
-    <version>4.0.1-V0004</version>
+    <version>5.1.107-develop</version>
     <title>XbimPlugin.MvdXML</title>
     <authors>xBIM team</authors>
     <owners>xBIM team</owners>
-    <licenseUrl>http://xbim.codeplex.com/license</licenseUrl>
-    <projectUrl>http://xbim.codeplex.com/</projectUrl>
-    <iconUrl>http://download-codeplex.sec.s-msft.com/Download?ProjectName=xbim&amp;DownloadId=373774&amp;Build=20335</iconUrl>
+    <license type="expression">CDDL-1.1</license>
+    <projectUrl>https://github.com/xBimTeam/XbimMvdXML</projectUrl>
+    <icon>Icon.png</icon>
     <requireLicenseAcceptance>true</requireLicenseAcceptance>
     <description>Integration with Xplorer UI for MvdXML model validation.</description>
     <summary>.</summary>
     <language>en-GB</language>
     <!-- the XplorerPlugin tag is used to identify plugins available for donwload from XbimXplorer-->
     <tags>MvdXML, XplorerPlugin</tags>
-    <!-- dependencies need to be worked out, at this stage they will be ignored during install -->
+    <!-- dependencies are used to determine the compatibiliy with the xplorer version... choose carefully -->
     <dependencies>
-      <dependency id="Xbim.WindowsUI" version="4.0.12-V0039" />
-      <dependency id="Xbim.Essentials" version="4.0.29-V002" />
+		<group targetFramework="net45">
+			<dependency id="Xbim.WindowsUI" version="[5.1.177-develop, 6)" />
+		</group>
     </dependencies>
   </metadata>
   <files>
     <file src="XbimPlugin.MvdXML\bin\Release\Xbim.MvdXml.dll" target="lib\net45\Xbim.MvdXml.dll" />
     <file src="XbimPlugin.MvdXML\bin\Release\XbimPlugin.MvdXML.exe" target="lib\net45\XbimPlugin.MvdXML.exe" />
+    <file src="Icon.png" target="Icon.png" />
   </files>
 </package>

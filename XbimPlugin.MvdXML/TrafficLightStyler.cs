@@ -25,8 +25,7 @@ namespace XbimPlugin.MvdXML
 
         private static WpfMeshGeometry3D PrepareMesh(XbimColour col)
         {
-            var matRed = new WpfMaterial();
-            matRed.CreateMaterial(col);
+            var matRed = new WpfMaterial(col);
             var mg = new WpfMeshGeometry3D(matRed, matRed);
             return mg;
         }
@@ -54,10 +53,12 @@ namespace XbimPlugin.MvdXML
         XbimColour _colourFail = new XbimColour("Red", 1.0, 0.0, 0.0, 0.5);
         XbimColour _colourWarning = new XbimColour("Amber", 1.0, 0.64, 0.0, 0.5);
         XbimColour _colourNa = new XbimColour("Blue", 0.0, 0.0, 1.0, 0.5);
-        
-        XbimScene<WpfMeshGeometry3D, WpfMaterial> ILayerStyler.BuildScene(IModel model, XbimMatrix3D modelTransform, ModelVisual3D opaqueShapes, ModelVisual3D transparentShapes, List<Type> exclude)
+
+
+        public XbimScene<WpfMeshGeometry3D, WpfMaterial> BuildScene(IModel model, XbimMatrix3D modelTransform, ModelVisual3D opaqueShapes, ModelVisual3D transparentShapes, List<IPersistEntity> isolateInstances = null, List<IPersistEntity> hideInstances = null, List<Type> excludeTypes = null)
         {
-            var excludedTypes = model.DefaultExclusions(exclude);
+            
+            var excludedTypes = model.DefaultExclusions(excludeTypes);
             var tmpOpaquesGroup = new Model3DGroup();
             var retScene = new XbimScene<WpfMeshGeometry3D, WpfMaterial>(model);
             var meshes = new List<WpfMeshGeometry3D>();
@@ -159,7 +160,7 @@ namespace XbimPlugin.MvdXML
             _colourNa = nonApplicable;
         }
         
-        void ILayerStyler.SetFederationEnvironment(IReferencedModel refModel)
+        public void SetFederationEnvironment(IReferencedModel refModel)
         {
             
         }

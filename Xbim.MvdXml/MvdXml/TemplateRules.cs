@@ -60,7 +60,10 @@ namespace Xbim.MvdXml
         internal List<DataIndicator> GetIndicators()
         {
             var ind = ((ITemplateRule)this).RecursiveProperiesRuleValues();
-            return ind?.Select(x => x.DataIndicator).Distinct().ToList() 
+            var all = ind?.Select(x => x.DataIndicator);
+            if (all == null)
+                return new List<DataIndicator>();
+            return all.Distinct().ToList() 
                 ?? new List<DataIndicator>();
         }
     }

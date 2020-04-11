@@ -1,10 +1,13 @@
-﻿using System;
+﻿using Microsoft.Extensions.Logging;
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
-using log4net;
+using System.Runtime.CompilerServices;
 using Xbim.Common;
 using Xbim.Common.Metadata;
+
+[assembly: InternalsVisibleTo("Tests")]
 
 // todo: we need to decide if the namespace Xbim.MvdXml.DataManagement makes sense
 // todo: and how it does relate to Xbim.MvdXml.Validation
@@ -15,7 +18,7 @@ namespace Xbim.MvdXml.DataManagement
     /// </summary>
     public partial class MvdEngine
     {
-        private static readonly ILog Log = LogManager.GetLogger("Xbim.MvdXml.DataManagement.MvdEngine");
+        private static readonly ILogger Log = Xbim.Common.XbimLogging.CreateLogger<MvdEngine>();
 
         // todo: there's probably scope for removing the model from the mvdEngine
         // we could have a manager to resolve references and UUIDs within the mvdxml schema
@@ -63,8 +66,7 @@ namespace Xbim.MvdXml.DataManagement
                 _expressTypeConceptRootLookup = new Dictionary<ExpressType, List<ConceptRoot>>();
             if (string.IsNullOrEmpty(conceptRoot.applicableRootEntity))
             {
-                Log.ErrorFormat(@"Null or empty ExpressType for ConceptRoot '{0}' (uuid: {1})",
-                    conceptRoot.name, conceptRoot.uuid);
+                Log.LogError($"Null or empty ExpressType for ConceptRoot '{conceptRoot.name}' (uuid: {conceptRoot.uuid})");
                 return;
             }
             try
@@ -79,8 +81,7 @@ namespace Xbim.MvdXml.DataManagement
             }
             catch (Exception)
             {
-                Log.ErrorFormat(@"ExpressType {0} not recognised for ConceptRoot '{1}' (uuid: {2})",
-                    conceptRoot.applicableRootEntity, conceptRoot.name, conceptRoot.uuid);
+                Log.LogError($"ExpressType {conceptRoot.applicableRootEntity} not recognised for ConceptRoot '{conceptRoot.name}' (uuid: {conceptRoot.uuid})");
             }
         }
 
@@ -259,7 +260,7 @@ namespace Xbim.MvdXml.DataManagement
                 var entityRuleValue = GetFieldValue(entity, attributeRule.AttributeName, out retProp);
                 if (retProp == null) // we are in the case where the property does not exist in the schema
                 {
-                    Log.Warn($"{attributeRule.AttributeName} property is not available for type {entity.GetType().Name} (as expected on attributeRule '{attributeRule.RuleID}' in {attributeRule.ParentConceptTemplate.uuid})");
+                    Log.LogWarning($"{attributeRule.AttributeName} property is not available for type {entity.GetType().Name} (as expected on attributeRule '{attributeRule.RuleID}' in {attributeRule.ParentConceptTemplate.uuid})");
                     continue;
                 }
 
@@ -287,7 +288,7 @@ namespace Xbim.MvdXml.DataManagement
             return DataFragment.Combine(f);
         }
         
-        private DataFragment ExtractRulesValues(IPersistEntity entity, DataIndicatorLookup dataIndicators, AttributeRule[] rules, string prefix)
+        private DataFragment ExtractRulesValues(IPersistEntity entity, DataIndicatorLookup dataIndicators, IEnumerable<IRule> rules, string prefix)
         {
             OnProcessing?.Invoke(this, 
                 new EntityProcessingEventArgs(entity, EntityProcessingEventArgs.ProcessingEvent.ExtractRulesValues));
@@ -304,14 +305,21 @@ namespace Xbim.MvdXml.DataManagement
                 var storageName = prefix + attributeRule.RuleID;
                 if (!dataIndicators.Contains(storageName))
                     continue;
-                ExpressMetaProperty retProp;
-                var value = GetFieldValue(entity, attributeRule.AttributeName, out retProp);
-                if (retProp == null)
+
+                // entityRules are already on the right element, attribute rules have to select it
+                object value = entity;
+                if (attributeRule is AttributeRule)
                 {
-                    // propery not found in class... ignore
-                    // 
-                    continue;
+                    ExpressMetaProperty retProp;
+                    value = GetFieldValue(entity, attributeRule.Name, out retProp);
+                    if (retProp == null)
+                    {
+                        // propery not found in class... ignore
+                        // 
+                        continue;
+                    }
                 }
+                
                 // set the value
                 if (dataIndicators.Requires(storageName, DataIndicator.ValueSelectorEnum.Value))
                 {
@@ -385,7 +393,7 @@ namespace Xbim.MvdXml.DataManagement
                 var classSchemaArray = classSchemaPair.Split(split, StringSplitOptions.None);
                 if (classSchemaArray.Length != 2)
                 {
-                    Log.ErrorFormat("{0} is not a recognised class identification.", classSchemaPair);
+                    Log.LogError($"{classSchemaPair} is not a recognised class identification.");
                     continue;
                 }
                 var tp = GetExpressType(classSchemaArray[0], classSchemaArray[1]);
@@ -399,11 +407,10 @@ namespace Xbim.MvdXml.DataManagement
         
         internal DataFragment FillEntities(EntityRule[] rules, IPersistEntity entity, DataIndicatorLookup dataIndicators, string prefix)
         {
-            // todo: review the return logic; 
-            
-            // 
             if (entity == null)
                 return null;
+            var retFragments = new List<DataFragment>();
+
             foreach (var entityRule in rules)
             {
                 // it's probably safe to assume that if we are here then the whole schema is the same of the element we are using
@@ -415,6 +422,13 @@ namespace Xbim.MvdXml.DataManagement
                 if (!filterType.NonAbstractSubTypes.Contains(entity.ExpressType))
                     continue;
 
+                var thisRuleFragments = new List<DataFragment>();
+
+                // get data at this level
+                var t1 = ExtractRulesValues(entity, dataIndicators, entityRule.Yield(), prefix);
+                if (t1 != null)
+                    thisRuleFragments.Add(t1);
+                
                 if (entityRule.References != null)
                 {
                     // need to resolve reference
@@ -425,16 +439,25 @@ namespace Xbim.MvdXml.DataManagement
                     var refTemplate = Mvd.GetConceptTemplate(entityRule.References.Template.@ref);
                     if (!string.IsNullOrEmpty(entityRule.References.IdPrefix))
                         tPrefix += entityRule.References.IdPrefix;
-                    // todo: xxx this is wrong! what about the following rules?
+                    
                     var t = GetAttributes(refTemplate, entity, dataIndicators, tPrefix);
-                    return t;
+                    thisRuleFragments.Add(t);
                 }
                 else if (entityRule.AttributeRules != null)
                 {
-                    // todo: xxx this is wrong! what about the following rules?
                     // rules nested directly
-                    return GetAttributes(entityRule.AttributeRules.AttributeRule, entity, dataIndicators, prefix);
+                    var t = GetAttributes(entityRule.AttributeRules.AttributeRule, entity, dataIndicators, prefix);
+                    thisRuleFragments.Add(t);
                 }
+
+                if (thisRuleFragments.Any())
+                {
+                    retFragments.Add(DataFragment.Combine(thisRuleFragments));
+                }
+            }
+            if (retFragments.Any())
+            {
+                return DataFragment.Combine(retFragments);
             }
             return null;
         }
@@ -478,7 +501,7 @@ namespace Xbim.MvdXml.DataManagement
         {
             if (string.IsNullOrEmpty(applicableClass))
             {
-                Log.ErrorFormat(@"GetConceptRoots() null or empty class name.");
+                Log.LogError(@"GetConceptRoots() null or empty class name.");
                 return Enumerable.Empty<ConceptRoot>();
             }
             try
@@ -488,7 +511,7 @@ namespace Xbim.MvdXml.DataManagement
             }
             catch 
             {
-                Log.WarnFormat(@"GetConceptRoots() invalid class name '{0}'", applicableClass);
+                Log.LogWarning($"GetConceptRoots() invalid class name '{applicableClass}'");
             }
             return Enumerable.Empty<ConceptRoot>();
         }
@@ -593,7 +616,7 @@ namespace Xbim.MvdXml.DataManagement
                 return schemaToUse;
             if (_failedLookupMessages.Contains(schemaIdentifier.ToLower()))
                 return null;
-            Log.Error($"Schema version {schemaIdentifier} is not a supported.");
+            Log.LogError($"Schema version {schemaIdentifier} is not a supported.");
             _failedLookupMessages.Add(schemaIdentifier.ToLower());
             return null;
         }
@@ -616,7 +639,7 @@ namespace Xbim.MvdXml.DataManagement
             // warn once only;
             if (_failedLookupMessages.Contains(classString.ToUpper()))
                 return null;
-            Log.Error($"{classString} is not a recognised class in {schema.Module.Name}.");
+            Log.LogError($"{classString} is not a recognised class in {schema.Module.Name}.");
             _failedLookupMessages.Add(classString.ToUpper());
             return null;
         }

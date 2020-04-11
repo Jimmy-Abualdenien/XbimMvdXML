@@ -17,7 +17,6 @@ using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Markup;
 using System.Windows.Media;
-using log4net;
 using Microsoft.Win32;
 using Xbim.MvdXml;
 using Xbim.MvdXml.DataManagement;
@@ -31,6 +30,7 @@ using Xbim.Ifc;
 using Xbim.Common.Metadata;
 using Xbim.MvdXml.Integrity;
 using XbimPlugin.MvdXML.ModelExtraction;
+using Microsoft.Extensions.Logging;
 
 namespace XbimPlugin.MvdXML
 {
@@ -40,7 +40,7 @@ namespace XbimPlugin.MvdXML
     [XplorerUiElement(PluginWindowUiContainerEnum.LayoutAnchorable, PluginWindowActivation.OnMenu, "MvdXML")]
     public partial class MainWindow : IXbimXplorerPluginWindow
     {
-        private static readonly ILog Log = LogManager.GetLogger("XbimPlugin.MvdXML.MainWindow");
+        private static readonly ILogger Log = Xbim.Common.XbimLogging.CreateLogger<MvdEngine>();
 
         public MainWindow()
         {
@@ -160,7 +160,7 @@ namespace XbimPlugin.MvdXML
         private static void NotifyError(string msg, Exception ex)
         {
             // log directly; ex is changed by the loop below.
-            Log.Error(msg, ex);
+            Log.LogError(msg, ex);
 
             // attempt to produce a richer UI feedback.
             var sb = new StringBuilder();
@@ -821,7 +821,7 @@ namespace XbimPlugin.MvdXML
             }
             catch (Exception ex)
             {
-                // Log.Error(ex.Message, ex);
+                Log.LogError(ex.Message, ex);
             }
         }
         
@@ -1101,7 +1101,7 @@ namespace XbimPlugin.MvdXML
                         // remove the hook
                         Doc.OnProcessing -= DocOnOnProcessing;
 
-                        Extractor.Extract(Model as IfcStore, new HashSet<IPersistEntity>(_identifiedItems.Keys));
+                        XbimPlugin.MvdXML.ModelExtraction.Extractor.Extract(Model as IfcStore, new HashSet<IPersistEntity>(_identifiedItems.Keys));
                         th.Append($"Strip command completed, attempting to extract {_identifiedItems.Keys.Count} entities.", Brushes.Black);
                         th.DropInto(TxtOut.Document);
                         continue;

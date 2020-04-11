@@ -1,15 +1,15 @@
-﻿using System.Collections.Generic;
-using log4net;
+﻿using Microsoft.Extensions.Logging;
+using System.Collections.Generic;
 
 // ReSharper disable once CheckNamespace
 namespace Xbim.MvdXml
 {
-    public partial class AttributeRule: IReference
+    public partial class AttributeRule: IReference, IRule
     {
-        private static readonly ILog Log = LogManager.GetLogger("Xbim.MvdXml.AttributeRule");
+        private static readonly ILogger Log = Xbim.Common.XbimLogging.CreateLogger<AttributeRule>();
 
         /// <summary>
-        /// Logs debug information about the tree in Log4Net.
+        /// Logs debug information about the tree.
         /// </summary>
         /// <param name="indentation">the level of indentation of the current branch</param>
         /// <param name="prefix">prefix for variable names</param>
@@ -18,13 +18,13 @@ namespace Xbim.MvdXml
 #if DEBUG
             var ind = new string('\t', indentation);
             if (!string.IsNullOrEmpty(RuleID))
-                Log.Debug($"{ind}{AttributeName} => {RuleID}");
+                Log.LogDebug($"{ind}{AttributeName} => {RuleID}");
 #endif
 
             foreach (var entityRule in EntityRules.NotNullEnumerable())
             {
 #if DEBUG
-                Log.DebugFormat("{0}{1}{2}{3}", ind, AttributeName,
+                Log.LogDebug("{0}{1}{2}{3}", ind, AttributeName,
                     string.IsNullOrEmpty(entityRule.EntityName) // conditional parameters are passed to #2 and #3
                         ? ""
                         : $" ({entityRule.EntityName})",
@@ -47,6 +47,8 @@ namespace Xbim.MvdXml
         /// </summary>
         [System.Xml.Serialization.XmlIgnore()]
         public ConceptTemplate ParentConceptTemplate { get; private set; }
+
+        public string Name => AttributeName;
 
         internal void SetParent(ConceptTemplate conceptTemplate)
         {
